@@ -1,0 +1,6 @@
+# 86px
+# 20m
+# --> 4.3 px/m
+px_per_m: 4.3
+sat_img_path: "fsg_sat.png"
+occ_img_path: "fsg_occup.png"

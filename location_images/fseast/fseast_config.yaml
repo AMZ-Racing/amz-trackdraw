@@ -1,0 +1,6 @@
+# 55px
+# 20m
+# --> 2.75 px/m
+px_per_m: 2.75
+sat_img_path: "fseast_sat.png"
+occ_img_path: "fseast_occup.png"
