@@ -2,7 +2,7 @@
 
 FS Trackdraw is a tool designed to help draw driverless racing tracks on 
 top of satellite images. The tracks can be exported in CSV format to be used in a simulator. 
-This tool allows you to define the centerline, boundaries, and cones on a map, taking into account obstacles and free spaces.
+This tool allows you to define the centerline, trackwidth, and the distance between consecutive cones, taking into account obstacles and free spaces.
 Location refers to the "event location" where you want to build your track.
 
 ![GUI Screenshot](gui_img.png)
