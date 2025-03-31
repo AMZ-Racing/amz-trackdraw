@@ -1,10 +1,11 @@
-# AMZ Trackdraw
+# FS Trackdraw
 
-AMZ Trackdraw is a tool designed to help draw driverless racing tracks on 
-top of satellite images. The tracks can be exported in CSV format to be used in AMZsim or any other simulator. This tool allows you to define the centerline, boundaries, and cones on a map, taking into account obstacles and free spaces.
+FS Trackdraw is a tool designed to help draw driverless racing tracks on 
+top of satellite images. The tracks can be exported in CSV format to be used in a simulator. 
+This tool allows you to define the centerline, boundaries, and cones on a map, taking into account obstacles and free spaces.
 Location refers to the "event location" where you want to build your track.
 
-![GUI Screenshot](trackdraw_gui.png)
+![GUI Screenshot](gui_img.png)
 
 ## Getting Started
 

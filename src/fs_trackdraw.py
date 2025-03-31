@@ -12,7 +12,7 @@ import yaml
 from scipy.interpolate import splprep, splev
 
 # ---------------------------- GUI CLASS ---------------------------- #
-class AMZTrackDraw(tk.Frame):
+class FSTrackDraw(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master
@@ -125,30 +125,6 @@ class AMZTrackDraw(tk.Frame):
         self.min_radius_label.pack(pady=5)
         self.cone_count_label = tk.Label(self.ui_frame, text="Cones: Blue: -- Yellow: -- Total: --", font=("Arial", 12))
         self.cone_count_label.pack(pady=5)
-        
-        # Load and create a PhotoImage for the logo
-        logo_path = "logo.png"  # Update with the actual path
-        logo_image = Image.open(logo_path)
-        # Get the original dimensions
-        original_width, original_height = logo_image.size
-        # Define a scaling factor (e.g., 0.1 for 10% of the original size)
-        scale_factor = 0.1
-        # Calculate the new dimensions while maintaining the aspect ratio
-        new_width = int(original_width * scale_factor)
-        new_height = int(original_height * scale_factor)
-        # Resize the image
-        logo_image = logo_image.resize((new_width, new_height))
-        self.logo_photo = ImageTk.PhotoImage(logo_image)
-        # Create a Label to hold the logo
-        self.logo_label = tk.Label(self.master, image=self.logo_photo, borderwidth=0, highlightthickness=0)
-        # Place the logo at the bottom-right corner of the main window
-        padding = 10  # The desired padding in pixels
-        self.logo_label.place(
-            relx=1.0, rely=1.0,
-            x=-padding,  # negative offset pushes the label left from the right edge
-            y=-padding,  # negative offset pushes the label up from the bottom edge
-            anchor='se'
-        )
         
         self.redraw()
         
