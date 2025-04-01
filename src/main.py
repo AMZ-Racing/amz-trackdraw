@@ -4,7 +4,7 @@ from fs_trackdraw import FSTrackDraw
 # ---------------------------- MAIN GUI FUNCTION ---------------------------- #
 def main_gui():
     root = tk.Tk()
-    root.title("Trackdraw")
+    root.title("TrackDraw")
     app = FSTrackDraw(root)
     root.mainloop()
 

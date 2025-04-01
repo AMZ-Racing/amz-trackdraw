@@ -125,6 +125,26 @@ class FSTrackDraw(tk.Frame):
         self.min_radius_label.pack(pady=5)
         self.cone_count_label = tk.Label(self.ui_frame, text="Cones: Blue: -- Yellow: -- Total: --", font=("Arial", 12))
         self.cone_count_label.pack(pady=5)
+
+        # Load the logo
+        self.logo = Image.open("TrackDraw_Logo.png")  # Update with the actual path to your logo
+        logo_width, logo_height = self.logo.size
+
+        # Scale the logo to fit within 100x100 px
+        max_logo_size = 200  # Maximum size for the logo (adjust as needed)
+        if logo_width > logo_height:
+            scale_factor = max_logo_size / logo_width
+        else:
+            scale_factor = max_logo_size / logo_height
+        new_size = (int(logo_width * scale_factor), int(logo_height * scale_factor))
+        self.logo = self.logo.resize(new_size)
+
+        # Convert the logo image to a PhotoImage
+        self.logo_photo = ImageTk.PhotoImage(self.logo)
+
+        # Create a Label to hold the logo and place it at the bottom-right corner of the right panel
+        self.logo_label = tk.Label(self.ui_frame, image=self.logo_photo, bg="white")
+        self.logo_label.pack(side=tk.BOTTOM, pady=10)  # Add some padding for spacing
         
         self.redraw()
         
