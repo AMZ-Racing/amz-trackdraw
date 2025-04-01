@@ -3,12 +3,10 @@ import numpy as np
 from shapely.geometry import LineString
 from scipy.interpolate import splprep, splev
 
-# ---------------------------- UTILITY FUNCTIONS ---------------------------- #
+
 def create_closed_spline(control_points, num_points=100):
     """
     Compute a smooth, closed B-spline from a list of control points.
-    We assume the user-specified control points form the basis;
-    splprep with per=True will create a periodic (closed) spline.
     """
     pts = np.array(control_points)
     # add first point to end to close the loop
@@ -20,7 +18,6 @@ def create_closed_spline(control_points, num_points=100):
     u_fine = np.linspace(0, 1, num_points)
     x_fine, y_fine = splev(u_fine, tck)
     return np.column_stack((x_fine, y_fine))
-
 
 def robust_parallel_offset(ls, distance, side, join_style=2):
     """
@@ -36,11 +33,9 @@ def robust_parallel_offset(ls, distance, side, join_style=2):
         return lines[0]
     return offset
 
-
 def generate_offset_boundaries(track_points, track_width_meters, px_per_m):
     """
     Compute left and right boundaries as parallel offsets from the centerline.
-    This method uses Shapely's parallel_offset for more robust behavior in tight corners.
     """
     track_width_px = track_width_meters * px_per_m
     ls = LineString(track_points)
@@ -51,7 +46,6 @@ def generate_offset_boundaries(track_points, track_width_meters, px_per_m):
     left_coords = list(left_offset.coords)
     right_coords = list(right_offset.coords)
     return np.array(left_coords), np.array(right_coords)
-
 
 def sample_cones(boundary, cone_spacing_meters, px_per_m):
     """Sample points along a boundary so that they are approximately cone_spacing_meters apart."""
