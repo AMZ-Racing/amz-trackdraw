@@ -5,6 +5,7 @@ import numpy as np
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                             QPushButton, QLineEdit, QFileDialog, QMessageBox)
 from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtGui import QPixmap
 import yaml
 from scipy.interpolate import splprep, splev
 from utils_qt import (create_closed_spline, generate_offset_boundaries, sample_cones)
@@ -128,9 +129,36 @@ class FSTrackDraw(QMainWindow):
         self.mode = "add"  # Modes: "add", "remove", "move"
         self.selected_point_index = None
         self.dragging = False
+
+        # Add logo at the bottom right
+        self.logo_label = QLabel()
+        self.logo_pixmap = QPixmap("TrackDraw_Logo.png")  # Load your logo image
+        # Add the logo label to the layout
+        self.ui_layout.addStretch(1)  # Push everything up
+        self.ui_layout.addWidget(self.logo_label, 0, Qt.AlignRight|Qt.AlignBottom)
+        # Handle window resize events
+        self.main_widget.resizeEvent = self.on_resize
+        # Initial logo setup
+        self.update_logo_size()
         
         # Initialize
         self.redraw()
+
+    def on_resize(self, event):
+      self.update_logo_size()
+      super().resizeEvent(event)  # Call parent's resize handler
+
+    def update_logo_size(self):
+      """Adjusts logo size when window is resized"""
+      if hasattr(self, 'logo_pixmap') and self.logo_pixmap and not self.logo_pixmap.isNull():
+          # Increased base size (adjust these values as needed)
+          max_width = min(200, self.ui_frame.width() - 20)  # 20px padding
+          scaled_pixmap = self.logo_pixmap.scaledToWidth(
+              max_width, 
+              Qt.SmoothTransformation
+          )
+          self.logo_label.setPixmap(scaled_pixmap)
+          self.logo_label.setFixedSize(scaled_pixmap.size())  # Prevent layout shifting
     
     def activate_add_mode(self):
         self.mode = "add"
