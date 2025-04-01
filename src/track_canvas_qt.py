@@ -12,12 +12,19 @@ class TrackCanvas(QWidget):
         super().__init__(parent)
         self.parent = parent
         self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+        # Zoom/pan variables
+        self.zoom = 1.0
+        self.pan = QPointF(0, 0)
+        self.pan_start = QPointF(0, 0)
+        self.is_panning = False
         
         # Initialize scaling factors
-        self.scale_x = 1.0
-        self.scale_y = 1.0
-        self.offset_x = 0
-        self.offset_y = 0
+        self.map_scale_x = 1.0
+        self.map_scale_y = 1.0
+        self.map_offset_x = 0
+        self.map_offset_y = 0
         
         # Load the satellite image
         self.sat_image = QImage(parent.fpath_location_sat_img)
@@ -42,6 +49,29 @@ class TrackCanvas(QWidget):
         self.left_boundary = None
         self.right_boundary = None
         self.boundaries_swapped = False
+
+    def wheelEvent(self, event):
+        # Zoom factor (10% per wheel step)
+        zoom_factor = 1.1
+        if event.angleDelta().y() < 0:
+            zoom_factor = 1 / zoom_factor
+        
+        # Get mouse position before zoom
+        mouse_pos = event.pos()
+        old_scene_pos = self.screen_to_map(mouse_pos)
+        
+        # Apply zoom
+        self.zoom *= zoom_factor
+        self.zoom = max(0.1, min(self.zoom, 10.0))  # Limit zoom range
+        
+        # Get mouse position after zoom
+        new_screen_pos = self.map_to_screen(old_scene_pos)
+        
+        # Adjust pan to zoom toward mouse
+        delta = mouse_pos - new_screen_pos
+        self.pan += delta
+        
+        self.update()
         
     def calculate_scaling_factors(self):
         """Calculate scaling factors to align occupancy map with satellite image."""
@@ -51,22 +81,54 @@ class TrackCanvas(QWidget):
         occ_height, occ_width = self.binary_map.shape
         
         # Calculate scaling factors
-        self.scale_x = sat_width / occ_width
-        self.scale_y = sat_height / occ_height
+        self.map_scale_x = sat_width / occ_width
+        self.map_scale_y = sat_height / occ_height
         
     def transform_point(self, map_x, map_y):
         """Convert from map coordinates to display coordinates"""
-        return (map_x * self.scale_x + self.offset_x,
-                map_y * self.scale_y + self.offset_y)
+        return (map_x * self.map_scale_x + self.map_offset_x,
+                map_y * self.map_scale_y + self.map_offset_y)
 
     def inverse_transform_point(self, display_x, display_y):
         """Convert from display coordinates to map coordinates"""
-        return ((display_x - self.offset_x) / self.scale_x,
-                (display_y - self.offset_y) / self.scale_y)
+        return ((display_x - self.map_offset_x) / self.map_scale_x,
+                (display_y - self.map_offset_y) / self.map_scale_y)
     
     def transform_polygon(self, polygon):
         """Transform a polygon from occupancy to display coordinates"""
         return [self.transform_point(p[0], p[1]) for p in polygon]
+    
+    def screen_to_map(self, screen_point):
+        """Convert screen coordinates to map coordinates"""
+        # Remove pan and zoom, then remove image scaling
+        image_x = (screen_point.x() - self.pan.x()) / self.zoom
+        image_y = (screen_point.y() - self.pan.y()) / self.zoom
+        map_x = (image_x - self.map_offset_x) / self.map_scale_x
+        map_y = (image_y - self.map_offset_y) / self.map_scale_y
+        return QPointF(map_x, map_y)
+
+    def map_to_screen(self, map_point):
+        """Convert map coordinates to screen coordinates"""
+        # Apply image scaling, then zoom and pan
+        image_x = map_point.x() * self.map_scale_x + self.map_offset_x
+        image_y = map_point.y() * self.map_scale_y + self.map_offset_y
+        screen_x = image_x * self.zoom + self.pan.x()
+        screen_y = image_y * self.zoom + self.pan.y()
+        return QPointF(int(screen_x), int(screen_y))
+    
+    def screen_to_scene(self, screen_point):
+        """Convert screen coordinates to image coordinates (including zoom/pan)"""
+        return QPointF(
+            (screen_point.x() - self.pan.x()) / self.zoom,
+            (screen_point.y() - self.pan.y()) / self.zoom
+        )
+
+    def scene_to_screen(self, scene_point):
+        """Convert image coordinates to screen coordinates (including zoom/pan)"""
+        return QPointF(
+            scene_point.x() * self.zoom + self.pan.x(),
+            scene_point.y() * self.zoom + self.pan.y()
+        )
         
     def extract_obstacle_polygons(self, binary_map):
         """Extract obstacle contours from the occupancy map with proper scaling."""
@@ -117,6 +179,10 @@ class TrackCanvas(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
+        # Apply zoom/pan transformation
+        painter.translate(self.pan)
+        painter.scale(self.zoom, self.zoom)
+
         # Draw scaled satellite image
         scaled_pixmap = self.sat_pixmap.scaled(
             self.width(), self.height(), 
@@ -125,8 +191,8 @@ class TrackCanvas(QWidget):
         painter.drawPixmap(0, 0, scaled_pixmap)
         
         # Calculate scaling factors based on actual displayed image size
-        self.scale_x = scaled_pixmap.width() / self.binary_map.shape[1]
-        self.scale_y = scaled_pixmap.height() / self.binary_map.shape[0]
+        self.map_scale_x = scaled_pixmap.width() / self.binary_map.shape[1]
+        self.map_scale_y = scaled_pixmap.height() / self.binary_map.shape[0]
         
         # Draw obstacles with proper scaling
         painter.setPen(QPen(QColor(255, 0, 0), 2))
@@ -257,15 +323,30 @@ class TrackCanvas(QWidget):
                 painter.drawEllipse(display_pt, 3, 3)
         
     def mousePressEvent(self, event):
-        # Transform mouse position back to map coordinates
-        map_x, map_y = self.inverse_transform_point(event.pos().x(), event.pos().y())
-        self.parent.handle_canvas_click(QPointF(map_x, map_y))
+        if event.button() == Qt.MiddleButton:
+            self.is_panning = True
+            self.pan_start = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+        else:
+            # Convert click to scene coordinates
+            scene_pos = self.screen_to_scene(event.pos())
+            # Then convert to map coordinates
+            map_x, map_y = self.inverse_transform_point(scene_pos.x(), scene_pos.y())
+            self.parent.handle_canvas_click(QPointF(map_x, map_y))
 
     def mouseMoveEvent(self, event):
-        if self.parent.dragging:
-            # Transform mouse position back to map coordinates
-            map_x, map_y = self.inverse_transform_point(event.pos().x(), event.pos().y())
-            self.parent.handle_canvas_drag(QPointF(map_x, map_y))
-            
+        if self.is_panning:
+            delta = event.pos() - self.pan_start
+            self.pan += delta
+            self.pan_start = event.pos()
+            self.update()
+        elif self.parent.dragging:
+            map_pos = self.screen_to_map(event.pos())
+            self.parent.handle_canvas_drag(QPointF(map_pos.x(), map_pos.y()))
+
     def mouseReleaseEvent(self, event):
-        self.parent.handle_canvas_release(event.pos())
+        if event.button() == Qt.MiddleButton:
+            self.is_panning = False
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            self.parent.handle_canvas_release(event.pos())
