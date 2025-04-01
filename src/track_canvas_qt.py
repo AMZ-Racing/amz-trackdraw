@@ -41,7 +41,11 @@ class TrackCanvas(QWidget):
         self.original_free_region = self.extract_free_region(self.binary_map)
 
         # Calculate scaling factors to match occupancy map with satellite image
-        self.calculate_scaling_factors()
+        sat_width = self.sat_image.width()
+        sat_height = self.sat_image.height()
+        occ_height, occ_width = self.binary_map.shape
+        self.map_scale_x = sat_width / occ_width
+        self.map_scale_y = sat_height / occ_height
         
         # Drawing elements
         self.control_points = []
@@ -72,17 +76,6 @@ class TrackCanvas(QWidget):
         self.pan += delta
         
         self.update()
-        
-    def calculate_scaling_factors(self):
-        """Calculate scaling factors to align occupancy map with satellite image."""
-        # Get dimensions of both images
-        sat_width = self.sat_image.width()
-        sat_height = self.sat_image.height()
-        occ_height, occ_width = self.binary_map.shape
-        
-        # Calculate scaling factors
-        self.map_scale_x = sat_width / occ_width
-        self.map_scale_y = sat_height / occ_height
         
     def transform_point(self, map_x, map_y):
         """Convert from map coordinates to display coordinates"""
