@@ -111,7 +111,7 @@ class FSTrackDraw(QMainWindow):
         self.min_radius_label.setStyleSheet("font-weight: bold;")
         self.ui_layout.addWidget(self.min_radius_label)
         
-        self.cone_count_label = QLabel("Cones: Blue: -- Yellow: -- Total: --")
+        self.cone_count_label = QLabel("Cones: \n Blue: -, Yellow: - \n Total: -")
         self.cone_count_label.setStyleSheet("font-weight: bold;")
         self.ui_layout.addWidget(self.cone_count_label)
         
@@ -311,7 +311,7 @@ class FSTrackDraw(QMainWindow):
             # Update the labels with calculated statistics
             self.track_length_label.setText(f"Track Length: {track_length:.2f} m")
             self.min_radius_label.setText(f"Min Radius: {min_radius:.2f} m")
-            self.cone_count_label.setText(f"Cones: Blue: {blue_cones} Yellow: {yellow_cones} Total: {total_cones}")
+            self.cone_count_label.setText(f"Cones: \n Blue: {blue_cones}, Yellow: {yellow_cones} \n Total: {total_cones}")
             
     def calculate_track_length(self):
         """Calculate the total length of the track (centerline B-spline)."""
