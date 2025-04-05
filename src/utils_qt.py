@@ -69,4 +69,9 @@ def sample_cones(boundary, cone_spacing_meters, px_per_m):
                 y = pts[i-1][1] + t * (pts[i][1] - pts[i-1][1])
                 sampled.append((x, y))
                 break
+
+    # Now, remove the last cone if it's too close to the first one
+    if len(sampled) > 1 and np.linalg.norm(np.array(sampled[0]) - np.array(sampled[-1])) < cone_spacing_meters:
+        sampled = sampled[:-1]
+
     return np.array(sampled)
