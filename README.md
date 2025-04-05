@@ -2,13 +2,13 @@
 
 FS Trackdraw is a tool designed to help draw driverless racing tracks on 
 top of satellite images. The tracks can be exported in CSV format for a simulator. 
-This tool allows you to define the centerline, trackwidth, and the distance between consecutive cones, considering obstacles and free spaces.
-In the scope of this repository, the word "location" refers to the "event location" where you want to build your track.
+This tool allows you to define the centerline, trackwidth, and the distance between 
+consecutive cones, considering obstacles and free spaces.
 
 ![GUI Screenshot](gui_img.png)
 
 ## Feature Ideas
-- Randomly generate admissible tracks (the reason for the occupancy image initially).
+- Randomly generate admissible tracks.
 - Load existing CSV-tracks into the satellite image.
 - Randomize cone spacings along and normal to the track.
 
@@ -23,10 +23,10 @@ Before starting, ensure you have the following:
 1. **Python 3** installed with the following dependencies:
 
    ```bash
-   pip install numpy scipy pandas matplotlib opencv-python pillow shapely pyyaml
+   pip install numpy scipy pandas matplotlib opencv-python pillow shapely pyyaml PyQt5
    ```
 
-2. A **Google Maps** screenshot of your location with the scale legend visible. You will need this for defining the location and scaling.
+2. A **Google Maps** screenshot of your location with the scale legend visible. You will need this for drawing the track and scaling.
 
 ### Step-by-Step Guide
 
@@ -34,25 +34,15 @@ Before starting, ensure you have the following:
    - Open Google Maps and find the location of the track.
    - Take a screenshot of the area including the scale legend (distance reference).
 
-2. **Create the Occupancy Grid:**
-   - Use a drawing tool like **GIMP** to create an occupancy grid on top of your screenshot.
-   - The occupancy grid highlights the areas where the track can and cannot go:
-     - **Black areas** represent regions where no track should be placed (e.g., obstacles, barriers).
-     - **White areas** represent free space for the track.
-   - Make sure to:
-     1. Draw the obstacles in **pure black**.
-     2. Select all black regions, invert the selection, and then fill the selected region with **white**.
-   
-3. **Calculate Scaling:**
+2. **Calculate Scaling:**
    - Use the scale legend in the screenshot to calculate the scaling factor from **pixels to meters (px/m)**.
    - This scaling factor will be used to convert the pixel-based track drawing into real-world measurements.
 
-4. **Prepare the Location Folder:**
+3. **Prepare the Location Folder:**
    - Create a folder named after your location in the `/location_images` directory.
    - Inside the folder, place the following files:
      - The **satellite image** (the original Google Maps screenshot).
-     - The **occupancy image** (created in step 2).
-     - A **config YAML file** containing the file names and the calculated scaling fraction (px/m).
+     - A **config YAML file** containing the image file name and the calculated scaling fraction (px/m).
    
    The folder structure should look like this:
    
@@ -60,7 +50,6 @@ Before starting, ensure you have the following:
    location_images/
    ├── your_loc/
    │   ├── your_loc_satellite_image.png
-   │   ├── your_loc_occupancy_image.png
    │   └── your_loc_location_name_config.yaml
    ```
 
@@ -69,12 +58,11 @@ Before starting, ensure you have the following:
    ```yaml
    px_per_m: 10.0  # scaling factor (px/m)
    sat_img_path: 'your_loc_satellite_image.png'
-   occ_img_path: 'your_loc_occupancy_image.png'
    ```
 
-5. **Configure the Main Track Configuration:**
+4. **Configure the Main Track Configuration:**
    - Open the `track_config.yaml` file located in the `config/` directory.
-   - Set the `standard_location` to match the folder name you created in step 4 (e.g., `your_loc`).
+   - Set the `standard_location` to match the folder name you created in step 3 (e.g., `your_loc`).
    - You can also adjust the default values for track width, cone distance, and boundary backoff in this configuration file.
 
    Example configuration (`track_config.yaml`):
@@ -95,9 +83,9 @@ Before starting, ensure you have the following:
    ```
 
    The tool will load the satellite image and display it on a GUI where you can:
-   - Add, remove, and move control points on the track.
+   - Add, remove, and move control points that define the track.
    - Define the centerline and boundaries.
-   - View the track's safe backoff region.
+   - Define an outer barrier and obstacles as polygons.
    - Adjust the cone spacing and boundary backoff interactively.
 
 7. **(Optional) Export the Track as a CSV:**
@@ -124,8 +112,8 @@ Before starting, ensure you have the following:
 - **Boundary Backoff:**
   The `min_boundary_backoff` specifies the safe distance from barriers. It ensures that the track is drawn at a sufficient distance away from any barrier.
 
-- **Satellite Image Size:**
-  Ensure that the size of the satellite image is preserved when creating the occupancy grid, as the scaling factor depends on the exact pixel dimensions.
+- **Conversion Factor:**
+  Ensure that the scaling factor is correct and yields reasonable distances in the exported .csv file.
 
 ### Visualizing the Track
 
