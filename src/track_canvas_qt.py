@@ -30,23 +30,6 @@ class TrackCanvas(QWidget):
         self.sat_image = QImage(parent.fpath_location_sat_img)
         self.sat_pixmap = QPixmap.fromImage(self.sat_image)
         
-        # Load occupancy map and extract obstacles with proper scaling
-        occ_img = cv2.imread(parent.fpath_location_occup_img, cv2.IMREAD_GRAYSCALE)
-        _, self.binary_map = cv2.threshold(occ_img, 128, 255, cv2.THRESH_BINARY)
-        self.obstacle_polygons = self.extract_obstacle_polygons(self.binary_map)
-        self.free_region = self.extract_free_region(self.binary_map)
-        
-        # Store original obstacle polygons before scaling
-        self.original_obstacle_polygons = self.extract_obstacle_polygons(self.binary_map)
-        self.original_free_region = self.extract_free_region(self.binary_map)
-
-        # Calculate scaling factors to match occupancy map with satellite image
-        sat_width = self.sat_image.width()
-        sat_height = self.sat_image.height()
-        occ_height, occ_width = self.binary_map.shape
-        self.map_scale_x = sat_width / occ_width
-        self.map_scale_y = sat_height / occ_height
-        
         # Drawing elements
         self.control_points = []
         self.centerline = None
@@ -54,12 +37,21 @@ class TrackCanvas(QWidget):
         self.right_boundary = None
         self.boundaries_swapped = False
 
+        self.barrier_polygon = None  # Barrier polygon
+        self.barrier_offset_polygon = None  # Offset polygon inside the barrier
+
+        # colors for drawing
+        self.left_color = QColor(0, 0, 255)
+        self.right_color = QColor(255, 255, 0)
+        self.barrier_color = QColor(255, 0, 0)
+        self.barrier_offset_color = QColor(0, 255, 0)
+
     def wheelEvent(self, event):
         # Zoom factor (10% per wheel step)
         zoom_factor = 1.1
         if event.angleDelta().y() < 0:
             zoom_factor = 1 / zoom_factor
-        
+
         # Get mouse position before zoom
         mouse_pos = event.pos()
         old_scene_pos = self.screen_to_map(mouse_pos)
@@ -88,7 +80,7 @@ class TrackCanvas(QWidget):
                 (display_y - self.map_offset_y) / self.map_scale_y)
     
     def transform_polygon(self, polygon):
-        """Transform a polygon from occupancy to display coordinates"""
+        """Transform a polygon from map to display coordinates"""
         return [self.transform_point(p[0], p[1]) for p in polygon]
     
     def screen_to_map(self, screen_point):
@@ -122,56 +114,23 @@ class TrackCanvas(QWidget):
             scene_point.x() * self.zoom + self.pan.x(),
             scene_point.y() * self.zoom + self.pan.y()
         )
-        
-    def extract_obstacle_polygons(self, binary_map):
-        """Extract obstacle contours from the occupancy map with proper scaling."""
-        contours, _ = cv2.findContours(binary_map, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        polys = []
-        if contours is not None:
-            for cnt in contours:
-                pts = cnt.squeeze()
-                if pts.ndim == 1:
-                    continue
-                # Scale points to match satellite image
-                scaled_pts = [self.transform_point(p[0], p[1]) for p in pts]
-                polys.append(scaled_pts)
-        return polys
-        
-    def extract_free_region(self, binary_map):
-        """Extract the largest external contour from the occupancy map as the free region."""
-        contours, _ = cv2.findContours(binary_map, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
-            return None
-        largest = max(contours, key=cv2.contourArea)
-        pts = largest.squeeze()
-        if pts.ndim == 1 or len(pts) < 3:
-            return None
-        if not np.array_equal(pts[0], pts[-1]):
-            pts = np.vstack([pts, pts[0]])
-        try:
-            # Scale points to match satellite image
-            scaled_pts = [self.transform_point(p[0], p[1]) for p in pts]
-            poly = Polygon(scaled_pts)
-            if not poly.is_valid or poly.is_empty:
-                return None
-            return poly
-        except Exception as e:
-            print("Error creating free region polygon:", e)
-            return None
-            
+
     def update_drawing(self, control_points, centerline, left_boundary, right_boundary, 
-                      boundaries_swapped):
+                      boundaries_swapped, barrier_polygon, barrier_offset_polygon):
+        """Update the drawing with new data"""
         self.control_points = control_points
         self.centerline = centerline
         self.left_boundary = left_boundary
         self.right_boundary = right_boundary
         self.boundaries_swapped = boundaries_swapped
+        self.barrier_polygon = barrier_polygon
+        self.barrier_offset_polygon = barrier_offset_polygon
         self.update()
         
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
+
         # Apply zoom/pan transformation
         painter.translate(self.pan)
         painter.scale(self.zoom, self.zoom)
@@ -182,37 +141,10 @@ class TrackCanvas(QWidget):
             Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
         painter.drawPixmap(0, 0, scaled_pixmap)
-        
-        # Calculate scaling factors based on actual displayed image size
-        self.map_scale_x = scaled_pixmap.width() / self.binary_map.shape[1]
-        self.map_scale_y = scaled_pixmap.height() / self.binary_map.shape[0]
-        
-        # Draw obstacles with proper scaling
-        painter.setPen(QPen(QColor(255, 0, 0), 2))
-        for poly in self.original_obstacle_polygons:
-            scaled_poly = self.transform_polygon(poly)
-            qpoly = QPolygonF([QPointF(p[0], p[1]) for p in scaled_poly])
-            painter.drawPolygon(qpoly)
-        
-        # Draw safe backoff region
-        try:
-            backoff_val = float(self.parent.backoff_entry.text())
-        except ValueError:
-            backoff_val = self.parent.min_boundary_backoff
-            
-        backoff_px = backoff_val * self.parent.px_per_m
-        if self.free_region is not None:
-            safe_region = self.free_region.buffer(-backoff_px)
-            if safe_region and not safe_region.is_empty and safe_region.exterior is not None:
-                coords = list(safe_region.exterior.coords)
-                if len(coords) >= 4:
-                    # Transform each coordinate point to display space
-                    scaled_coords = [self.transform_point(p[0], p[1]) for p in coords]
-                    qpoly = QPolygonF([QPointF(p[0], p[1]) for p in scaled_coords])
-                    pen = QPen(QColor(255, 0, 255), 2)
-                    pen.setStyle(Qt.DashLine)
-                    painter.setPen(pen)
-                    painter.drawPolygon(qpoly)
+
+        # Recalculate map scaling factors based on current window size and image size
+        self.map_scale_x = scaled_pixmap.width() / self.sat_image.width()
+        self.map_scale_y = scaled_pixmap.height() / self.sat_image.height()
         
         # Draw control points (in display coordinates)
         for i, pt in enumerate(self.control_points):
@@ -246,8 +178,7 @@ class TrackCanvas(QWidget):
 
         # Draw boundaries (transform from map to display coords)
         if self.left_boundary and len(self.left_boundary) > 1:
-            left_color = QColor(0, 0, 255) if not self.boundaries_swapped else QColor(255, 255, 0)
-            painter.setPen(QPen(left_color, 2))
+            painter.setPen(QPen(self.left_color, 2))
             
             # Convert boundary points to display coordinates
             display_points = []
@@ -260,8 +191,7 @@ class TrackCanvas(QWidget):
             painter.drawPolyline(QPolygonF(display_points))
 
         if self.right_boundary and len(self.right_boundary) > 1:
-            right_color = QColor(255, 255, 0) if not self.boundaries_swapped else QColor(0, 0, 255)
-            painter.setPen(QPen(right_color, 2))
+            painter.setPen(QPen(self.right_color, 2))
             
             # Convert boundary points to display coordinates
             display_points = []
@@ -290,8 +220,7 @@ class TrackCanvas(QWidget):
             
             left_cones = sample_cones(np.array(boundary_points), cone_spacing, self.parent.px_per_m)
             
-            left_color = QColor(255, 255, 0) if self.boundaries_swapped else QColor(0, 0, 255)
-            painter.setBrush(left_color)
+            painter.setBrush(self.left_color)
             painter.setPen(QPen(QColor(0, 0, 0), 1))
             for pt in left_cones:
                 display_pt = QPointF(*self.transform_point(pt[0], pt[1]))
@@ -308,18 +237,56 @@ class TrackCanvas(QWidget):
             
             right_cones = sample_cones(np.array(boundary_points), cone_spacing, self.parent.px_per_m)
             
-            right_color = QColor(0, 0, 255) if self.boundaries_swapped else QColor(255, 255, 0)
-            painter.setBrush(right_color)
+            painter.setBrush(self.right_color)
             painter.setPen(QPen(QColor(0, 0, 0), 1))
             for pt in right_cones:
                 display_pt = QPointF(*self.transform_point(pt[0], pt[1]))
                 painter.drawEllipse(display_pt, 3, 3)
+
+        # Draw barriers (transform from map to display coords)
+        if self.barrier_polygon is not None:
+            # Draw barrier polygon
+            for i, pt in enumerate(self.barrier_polygon):
+                display_pt = QPointF(*self.transform_point(pt.x(), pt.y()))
+                if i == 0 and len(self.barrier_polygon) > 2:
+                    painter.setBrush(QColor(0, 255, 0))  # Red for first point
+                elif i == len(self.barrier_polygon) - 1 and len(self.barrier_polygon) > 2:
+                    painter.setBrush(QColor(0, 0, 255))  # Blue for last point
+                else:
+                    painter.setBrush(self.barrier_color)  # Red for others
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawEllipse(display_pt, 5, 5)
+            # Draw barrier polygon outline
+            painter.setPen(QPen(self.barrier_color, 2))
+            display_points = []
+            for pt in self.barrier_polygon:
+                if isinstance(pt, QPointF):
+                    display_points.append(QPointF(*self.transform_point(pt.x(), pt.y())))
+                else:
+                    display_points.append(QPointF(*self.transform_point(pt[0], pt[1])))
+            painter.drawPolyline(QPolygonF(display_points))
+            # Draw offset polygon
+            if self.barrier_offset_polygon is not None:
+                painter.setPen(QPen(self.barrier_offset_color, 2))
+                display_points = []
+                for pt in self.barrier_offset_polygon:
+                    if isinstance(pt, QPointF):
+                        display_points.append(QPointF(*self.transform_point(pt.x(), pt.y())))
+                    else:
+                        display_points.append(QPointF(*self.transform_point(pt[0], pt[1])))
+                painter.drawPolyline(QPolygonF(display_points))
         
     def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
             self.is_panning = True
             self.pan_start = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
+        elif event.button() == Qt.RightButton:
+            # Convert click to scene coordinates
+            scene_pos = self.screen_to_scene(event.pos())
+            # Then convert to map coordinates
+            map_x, map_y = self.inverse_transform_point(scene_pos.x(), scene_pos.y())
+            self.parent.handle_canvas_rightclick(QPointF(map_x, map_y))
         else:
             # Convert click to scene coordinates
             scene_pos = self.screen_to_scene(event.pos())
@@ -334,6 +301,9 @@ class TrackCanvas(QWidget):
             self.pan_start = event.pos()
             self.update()
         elif self.parent.dragging:
+            map_pos = self.screen_to_map(event.pos())
+            self.parent.handle_canvas_drag(QPointF(map_pos.x(), map_pos.y()))
+        elif self.parent.dragging_barrier:
             map_pos = self.screen_to_map(event.pos())
             self.parent.handle_canvas_drag(QPointF(map_pos.x(), map_pos.y()))
 

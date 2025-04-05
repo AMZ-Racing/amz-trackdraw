@@ -3,4 +3,3 @@
 # --> 10 px/m
 px_per_m: 10.0
 sat_img_path: "empty_sat.png"
-occ_img_path: "emtpy_occup.png"

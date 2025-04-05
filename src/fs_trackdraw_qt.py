@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QPointF
 from PyQt5.QtGui import QPixmap
 import yaml
 from scipy.interpolate import splprep, splev
-from utils_qt import (create_closed_spline, generate_offset_boundaries, sample_cones)
+from utils_qt import (create_closed_spline, generate_offset_boundaries, sample_cones, generate_oneside_boundary)
 from track_canvas_qt import TrackCanvas
 
 
@@ -35,9 +35,7 @@ class FSTrackDraw(QMainWindow):
             config = yaml.safe_load(file)
             self.px_per_m = config.get('px_per_m', 10.0)
             sat_img_file = config.get('sat_img_path', '')
-            occup_img_file = config.get('occ_img_path', '')
             self.fpath_location_sat_img = os.path.join(self.folderpath_location, sat_img_file)
-            self.fpath_location_occup_img = os.path.join(self.folderpath_location, occup_img_file)
         
         # Create main widget and layout
         self.main_widget = QWidget()
@@ -59,7 +57,7 @@ class FSTrackDraw(QMainWindow):
         self.main_layout.addWidget(self.ui_frame)
         
         # Mode label
-        self.mode_label = QLabel("Mode: Add")
+        self.mode_label = QLabel("Track Mode: Add")
         self.mode_label.setStyleSheet("font-weight: bold; font-size: 12px;")
         self.ui_layout.addWidget(self.mode_label)
         
@@ -76,10 +74,12 @@ class FSTrackDraw(QMainWindow):
         self.move_button.clicked.connect(self.activate_move_mode)
         self.ui_layout.addWidget(self.move_button)
         
+        # Swap boundaries button
         self.swap_button = QPushButton("Swap Boundaries")
         self.swap_button.clicked.connect(self.swap_boundaries)
         self.ui_layout.addWidget(self.swap_button)
         
+        # Export button
         self.export_button = QPushButton("Export CSV")
         self.export_button.clicked.connect(self.export_csv)
         self.ui_layout.addWidget(self.export_button)
@@ -89,30 +89,55 @@ class FSTrackDraw(QMainWindow):
         self.cone_spacing_entry = QLineEdit(str(self.default_cone_distance))
         self.cone_spacing_entry.returnPressed.connect(self.redraw)
         self.ui_layout.addWidget(self.cone_spacing_entry)
-        
-        # Backoff input
-        self.ui_layout.addWidget(QLabel("Backoff (m):"))
-        self.backoff_entry = QLineEdit(str(self.min_boundary_backoff))
-        self.backoff_entry.returnPressed.connect(self.redraw)
-        self.ui_layout.addWidget(self.backoff_entry)
-        
+
         # Track width input
         self.ui_layout.addWidget(QLabel("Track width (m):"))
         self.track_width_entry = QLineEdit(str(self.track_width))
         self.track_width_entry.returnPressed.connect(self.redraw)
         self.ui_layout.addWidget(self.track_width_entry)
-        
+
+        # Barrier Mode Label
+        self.barrier_mode_label = QLabel("Barrier Mode: Add")
+        self.barrier_mode_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.ui_layout.addWidget(self.barrier_mode_label)
+
+        # Add barrier mode buttons
+        self.add_barrier_button = QPushButton("Add Barrier Point")
+        self.add_barrier_button.clicked.connect(self.activate_add_barrier_mode)
+        self.ui_layout.addWidget(self.add_barrier_button)
+
+        self.move_barrier_button = QPushButton("Move Barrier Point")
+        self.move_barrier_button.clicked.connect(self.activate_move_barrier_mode)
+        self.ui_layout.addWidget(self.move_barrier_button)
+
+        self.remove_barrier_button = QPushButton("Remove Barrier Point")
+        self.remove_barrier_button.clicked.connect(self.activate_remove_barrier_mode)
+        self.ui_layout.addWidget(self.remove_barrier_button)
+
+        # Swap barrier offset button
+        self.swap_barrier_button = QPushButton("Swap Barrier Offset")
+        self.swap_barrier_button.clicked.connect(self.swap_barrier_offset)
+        self.ui_layout.addWidget(self.swap_barrier_button)
+
+        # Backoff input
+        self.ui_layout.addWidget(QLabel("Backoff (m):"))
+        self.backoff_entry = QLineEdit(str(self.min_boundary_backoff))
+        self.backoff_entry.returnPressed.connect(self.redraw)
+        self.ui_layout.addWidget(self.backoff_entry)
+
+        # Add label that explains to use right click for barrier points
+        self.ui_layout.addWidget(QLabel("Right Click: Barrier Points"))
+        # Add label that explains to use left click for track control points
+        self.ui_layout.addWidget(QLabel("Left Click: Track Control Points"))
+
         # Statistics labels
         self.track_length_label = QLabel("Track Length: --")
-        self.track_length_label.setStyleSheet("font-weight: bold;")
         self.ui_layout.addWidget(self.track_length_label)
         
         self.min_radius_label = QLabel("Min Radius: --")
-        self.min_radius_label.setStyleSheet("font-weight: bold;")
         self.ui_layout.addWidget(self.min_radius_label)
         
         self.cone_count_label = QLabel("Cones: \n Blue: -, Yellow: - \n Total: -")
-        self.cone_count_label.setStyleSheet("font-weight: bold;")
         self.ui_layout.addWidget(self.cone_count_label)
         
         # Add stretch to push everything up
@@ -120,23 +145,29 @@ class FSTrackDraw(QMainWindow):
         
         # Data for control points and track
         self.control_points = []  # List of QPointF
+        self.barrier_polygon = []  # List of barrier points
+        self.barrier_offset_polygon = []  # List of offset points
         self.centerline = None
         self.left_boundary = None
         self.right_boundary = None
         self.boundaries_swapped = False
+        self.barrier_offset_swapped = False
         self.perform_swap = False
+        self.perform_barrier_swap = False
         
         # GUI control variables
         self.mode = "add"  # Modes: "add", "remove", "move"
         self.selected_point_index = None
         self.dragging = False
+        self.dragging_barrier = False
+        self.barrier_mode = "add"  # Default mode is adding barrier points
 
         # Add logo at the bottom right
         self.logo_label = QLabel()
         self.logo_pixmap = QPixmap("TrackDraw_Logo.png")  # Load your logo image
         # Add the logo label to the layout
         self.ui_layout.addStretch(1)  # Push everything up
-        self.ui_layout.addWidget(self.logo_label, 0, Qt.AlignRight|Qt.AlignBottom)
+        self.ui_layout.addWidget(self.logo_label, 0, Qt.AlignCenter)
         # Handle window resize events
         self.main_widget.resizeEvent = self.on_resize
         # Initial logo setup
@@ -172,11 +203,44 @@ class FSTrackDraw(QMainWindow):
     def activate_move_mode(self):
         self.mode = "move"
         self.mode_label.setText("Mode: Move")
+
+    def activate_add_barrier_mode(self):
+        self.barrier_mode = "add"
+        self.barrier_mode_label.setText("Barrier Mode: Add")
+
+    def activate_move_barrier_mode(self):
+        self.barrier_mode = "move"
+        self.barrier_mode_label.setText("Barrier Mode: Move")
+
+    def activate_remove_barrier_mode(self):
+        self.barrier_mode = "remove"
+        self.barrier_mode_label.setText("Barrier Mode: Remove")
         
     def swap_boundaries(self):
         self.boundaries_swapped = not self.boundaries_swapped
         self.perform_swap = True
         self.redraw()
+
+    def swap_barrier_offset(self):
+        self.barrier_offset_swapped = not self.barrier_offset_swapped
+        self.perform_barrier_swap = True
+        self.redraw()
+    
+    def handle_canvas_rightclick(self, pos):
+        x, y = pos.x(), pos.y()
+        if self.barrier_mode == "add":
+            self.barrier_polygon.insert(0, QPointF(x, y))
+            self.redraw()
+        elif self.barrier_mode == "remove":
+            idx = self.find_near_barrier_point(x, y)
+            if idx is not None:
+                del self.barrier_polygon[idx]
+                self.redraw()
+        elif self.barrier_mode == "move":
+            idx = self.find_near_barrier_point(x, y, threshold=20)
+            if idx is not None:
+                self.selected_point_index = idx
+                self.dragging_barrier = True
         
     def handle_canvas_click(self, pos):
         x, y = pos.x(), pos.y()
@@ -194,20 +258,31 @@ class FSTrackDraw(QMainWindow):
             if idx is not None:
                 self.selected_point_index = idx
                 self.dragging = True
-                
+
     def handle_canvas_drag(self, pos):
         if self.dragging and self.selected_point_index is not None and self.mode == "move":
             self.control_points[self.selected_point_index] = QPointF(pos.x(), pos.y())
             self.redraw()
+        elif self.dragging_barrier and self.selected_point_index is not None and self.barrier_mode == "move":
+            self.barrier_polygon[self.selected_point_index] = QPointF(pos.x(), pos.y())
+            self.redraw()
             
     def handle_canvas_release(self, pos):
         self.dragging = False
+        self.dragging_barrier = False
         self.selected_point_index = None
         
     def find_near_control_point(self, x, y, threshold=10):
         for i, pt in enumerate(self.control_points):
             if (pt.x() - x) ** 2 + (pt.y() - y) ** 2 < threshold ** 2:
                 return i
+        return None
+    
+    def find_near_barrier_point(self, x, y, threshold=10):
+        if self.barrier_polygon is not None:
+            for i, pt in enumerate(self.barrier_polygon):
+                if (pt.x() - x) ** 2 + (pt.y() - y) ** 2 < threshold ** 2:
+                    return i
         return None
         
     def export_csv(self):
@@ -271,6 +346,11 @@ class FSTrackDraw(QMainWindow):
             # reverse the order of the control points
             self.control_points.reverse()
             self.perform_swap = False
+
+        if self.perform_barrier_swap:
+            # reverse the order of the barrier points
+            self.barrier_polygon.reverse()
+            self.perform_barrier_swap = False
         
         # Update track parameters
         try:
@@ -310,12 +390,21 @@ class FSTrackDraw(QMainWindow):
             self.min_radius_label.setText(f"Min Radius: {min_radius:.2f} m")
             self.cone_count_label.setText(f"Cones: \n Blue: {blue_cones}, Yellow: {yellow_cones} \n Total: {total_cones}")
 
+        if len(self.barrier_polygon) > 2:
+            # Convert barrier polygon to numpy array for spline calculation
+            pts = np.array([[p.x(), p.y()] for p in self.barrier_polygon])
+            self.barrier_offset_polygon = generate_oneside_boundary(pts, self.min_boundary_backoff, self.px_per_m)
+            if self.barrier_offset_polygon is not None:
+                self.barrier_offset_polygon = [QPointF(p[0], p[1]) for p in self.barrier_offset_polygon]
+
         self.canvas.update_drawing(
           self.control_points,
           self.centerline,
           self.left_boundary,
           self.right_boundary,
-          self.boundaries_swapped
+          self.boundaries_swapped,
+          self.barrier_polygon,
+          self.barrier_offset_polygon,
         )
             
     def calculate_track_length(self):
