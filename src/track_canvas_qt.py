@@ -37,15 +37,21 @@ class TrackCanvas(QWidget):
         self.right_boundary = None
         self.boundaries_swapped = False
 
+        self.barrier_polygon = None  # Barrier polygon
+        self.barrier_offset_polygon = None  # Offset polygon inside the barrier
+
+        # colors for drawing
         self.left_color = QColor(0, 0, 255)
         self.right_color = QColor(255, 255, 0)
+        self.barrier_color = QColor(255, 0, 0)
+        self.barrier_offset_color = QColor(0, 255, 0)
 
     def wheelEvent(self, event):
         # Zoom factor (10% per wheel step)
         zoom_factor = 1.1
         if event.angleDelta().y() < 0:
             zoom_factor = 1 / zoom_factor
-        
+
         # Get mouse position before zoom
         mouse_pos = event.pos()
         old_scene_pos = self.screen_to_map(mouse_pos)
@@ -110,18 +116,21 @@ class TrackCanvas(QWidget):
         )
 
     def update_drawing(self, control_points, centerline, left_boundary, right_boundary, 
-                      boundaries_swapped):
+                      boundaries_swapped, barrier_polygon, barrier_offset_polygon):
+        """Update the drawing with new data"""
         self.control_points = control_points
         self.centerline = centerline
         self.left_boundary = left_boundary
         self.right_boundary = right_boundary
         self.boundaries_swapped = boundaries_swapped
+        self.barrier_polygon = barrier_polygon
+        self.barrier_offset_polygon = barrier_offset_polygon
         self.update()
         
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
+
         # Apply zoom/pan transformation
         painter.translate(self.pan)
         painter.scale(self.zoom, self.zoom)
@@ -233,12 +242,51 @@ class TrackCanvas(QWidget):
             for pt in right_cones:
                 display_pt = QPointF(*self.transform_point(pt[0], pt[1]))
                 painter.drawEllipse(display_pt, 3, 3)
+
+        # Draw barriers (transform from map to display coords)
+        if self.barrier_polygon is not None:
+            # Draw barrier polygon
+            for i, pt in enumerate(self.barrier_polygon):
+                display_pt = QPointF(*self.transform_point(pt.x(), pt.y()))
+                if i == 0 and len(self.barrier_polygon) > 2:
+                    painter.setBrush(QColor(0, 255, 0))  # Red for first point
+                elif i == len(self.barrier_polygon) - 1 and len(self.barrier_polygon) > 2:
+                    painter.setBrush(QColor(0, 0, 255))  # Blue for last point
+                else:
+                    painter.setBrush(self.barrier_color)  # Red for others
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawEllipse(display_pt, 5, 5)
+            # Draw barrier polygon outline
+            painter.setPen(QPen(self.barrier_color, 2))
+            display_points = []
+            for pt in self.barrier_polygon:
+                if isinstance(pt, QPointF):
+                    display_points.append(QPointF(*self.transform_point(pt.x(), pt.y())))
+                else:
+                    display_points.append(QPointF(*self.transform_point(pt[0], pt[1])))
+            painter.drawPolyline(QPolygonF(display_points))
+            # Draw offset polygon
+            if self.barrier_offset_polygon is not None:
+                painter.setPen(QPen(self.barrier_offset_color, 2))
+                display_points = []
+                for pt in self.barrier_offset_polygon:
+                    if isinstance(pt, QPointF):
+                        display_points.append(QPointF(*self.transform_point(pt.x(), pt.y())))
+                    else:
+                        display_points.append(QPointF(*self.transform_point(pt[0], pt[1])))
+                painter.drawPolyline(QPolygonF(display_points))
         
     def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
             self.is_panning = True
             self.pan_start = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
+        elif event.button() == Qt.RightButton:
+            # Convert click to scene coordinates
+            scene_pos = self.screen_to_scene(event.pos())
+            # Then convert to map coordinates
+            map_x, map_y = self.inverse_transform_point(scene_pos.x(), scene_pos.y())
+            self.parent.handle_canvas_rightclick(QPointF(map_x, map_y))
         else:
             # Convert click to scene coordinates
             scene_pos = self.screen_to_scene(event.pos())
@@ -253,6 +301,9 @@ class TrackCanvas(QWidget):
             self.pan_start = event.pos()
             self.update()
         elif self.parent.dragging:
+            map_pos = self.screen_to_map(event.pos())
+            self.parent.handle_canvas_drag(QPointF(map_pos.x(), map_pos.y()))
+        elif self.parent.dragging_barrier:
             map_pos = self.screen_to_map(event.pos())
             self.parent.handle_canvas_drag(QPointF(map_pos.x(), map_pos.y()))
 

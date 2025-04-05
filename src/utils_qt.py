@@ -47,6 +47,18 @@ def generate_offset_boundaries(track_points, track_width_meters, px_per_m):
     right_coords = list(right_offset.coords)
     return np.array(left_coords), np.array(right_coords)
 
+def generate_oneside_boundary(points, offset_meters, px_per_m):
+    """
+    Generate a one-sided boundary by offsetting the given points.
+    """
+    offset_px = offset_meters * px_per_m
+    ls = LineString(points)
+    left_offset = robust_parallel_offset(ls, offset_px, 'left', join_style=2)
+    if left_offset is None:
+        return None
+    left_coords = list(left_offset.coords)
+    return np.array(left_coords)
+
 def sample_cones(boundary, cone_spacing_meters, px_per_m):
     """Sample points along a boundary so that they are approximately cone_spacing_meters apart."""
     cone_spacing_px = cone_spacing_meters * px_per_m
