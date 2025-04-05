@@ -124,6 +124,7 @@ class FSTrackDraw(QMainWindow):
         self.left_boundary = None
         self.right_boundary = None
         self.boundaries_swapped = False
+        self.perform_swap = False
         
         # GUI control variables
         self.mode = "add"  # Modes: "add", "remove", "move"
@@ -174,12 +175,14 @@ class FSTrackDraw(QMainWindow):
         
     def swap_boundaries(self):
         self.boundaries_swapped = not self.boundaries_swapped
+        self.perform_swap = True
         self.redraw()
         
     def handle_canvas_click(self, pos):
         x, y = pos.x(), pos.y()
         if self.mode == "add":
-            self.control_points.append(QPointF(x, y))
+            # self.control_points.append(QPointF(x, y))
+            self.control_points.insert(0, QPointF(x, y))
             self.redraw()
         elif self.mode == "remove":
             idx = self.find_near_control_point(x, y)
@@ -246,12 +249,8 @@ class FSTrackDraw(QMainWindow):
         left_cones_m = [transform(pt) for pt in left_cones]
         right_cones_m = [transform(pt) for pt in right_cones]
         
-        if self.boundaries_swapped:
-            left_tag = "yellow"
-            right_tag = "blue"
-        else:
-            left_tag = "blue"
-            right_tag = "yellow"
+        left_tag = "blue"
+        right_tag = "yellow"
             
         filename, _ = QFileDialog.getSaveFileName(self, "Save CSV", "", "CSV files (*.csv)")
         if not filename:
@@ -266,15 +265,12 @@ class FSTrackDraw(QMainWindow):
                 writer.writerow([left_tag, pt[0], pt[1]])
                 
         QMessageBox.information(self, "Export", f"Track exported to {filename}")
-        
+
     def redraw(self):
-        self.canvas.update_drawing(
-            self.control_points,
-            self.centerline,
-            self.left_boundary,
-            self.right_boundary,
-            self.boundaries_swapped
-        )
+        if self.perform_swap:
+            # reverse the order of the control points
+            self.control_points.reverse()
+            self.perform_swap = False
         
         # Update track parameters
         try:
@@ -295,7 +291,8 @@ class FSTrackDraw(QMainWindow):
             centerline = create_closed_spline(pts, num_points=self.n_points_midline)
             self.centerline = [QPointF(p[0], p[1]) for p in centerline]
             
-            boundaries = generate_offset_boundaries(centerline, self.track_width, self.px_per_m)
+            boundaries = generate_offset_boundaries(centerline, self.track_width, 
+                                                    self.px_per_m)
             if boundaries[0] is None or boundaries[1] is None:
                 return
                 
@@ -312,6 +309,14 @@ class FSTrackDraw(QMainWindow):
             self.track_length_label.setText(f"Track Length: {track_length:.2f} m")
             self.min_radius_label.setText(f"Min Radius: {min_radius:.2f} m")
             self.cone_count_label.setText(f"Cones: \n Blue: {blue_cones}, Yellow: {yellow_cones} \n Total: {total_cones}")
+
+        self.canvas.update_drawing(
+          self.control_points,
+          self.centerline,
+          self.left_boundary,
+          self.right_boundary,
+          self.boundaries_swapped
+        )
             
     def calculate_track_length(self):
         """Calculate the total length of the track (centerline B-spline)."""
@@ -377,7 +382,4 @@ class FSTrackDraw(QMainWindow):
         left_cones = sample_cones(left_boundary, cone_spacing, self.px_per_m)
         right_cones = sample_cones(right_boundary, cone_spacing, self.px_per_m)
         
-        if self.boundaries_swapped:
-            return len(right_cones), len(left_cones), len(right_cones) + len(left_cones)
-        else:
-            return len(left_cones), len(right_cones), len(left_cones) + len(right_cones)
+        return len(left_cones), len(right_cones), len(left_cones) + len(right_cones)
