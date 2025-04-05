@@ -2,4 +2,4 @@ track_width: 3.0
 cone_distance: 3.5
 min_boundary_backoff: 10.0
 n_points_midline: 300
-standard_location: "fsg1"
+standard_location: "ipz"
