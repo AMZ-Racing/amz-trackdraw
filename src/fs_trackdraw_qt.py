@@ -89,22 +89,17 @@ class FSTrackDraw(QMainWindow):
         self.cone_spacing_entry = QLineEdit(str(self.default_cone_distance))
         self.cone_spacing_entry.returnPressed.connect(self.redraw)
         self.ui_layout.addWidget(self.cone_spacing_entry)
-        
+
         # Track width input
         self.ui_layout.addWidget(QLabel("Track width (m):"))
         self.track_width_entry = QLineEdit(str(self.track_width))
         self.track_width_entry.returnPressed.connect(self.redraw)
         self.ui_layout.addWidget(self.track_width_entry)
-        
-        # Statistics labels
-        self.track_length_label = QLabel("Track Length: --")
-        self.ui_layout.addWidget(self.track_length_label)
-        
-        self.min_radius_label = QLabel("Min Radius: --")
-        self.ui_layout.addWidget(self.min_radius_label)
-        
-        self.cone_count_label = QLabel("Cones: \n Blue: -, Yellow: - \n Total: -")
-        self.ui_layout.addWidget(self.cone_count_label)
+
+        # Barrier Mode Label
+        self.barrier_mode_label = QLabel("Barrier Mode: Add")
+        self.barrier_mode_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.ui_layout.addWidget(self.barrier_mode_label)
 
         # Add barrier mode buttons
         self.add_barrier_button = QPushButton("Add Barrier Point")
@@ -130,10 +125,20 @@ class FSTrackDraw(QMainWindow):
         self.backoff_entry.returnPressed.connect(self.redraw)
         self.ui_layout.addWidget(self.backoff_entry)
 
-        # Barrier Mode Label
-        self.barrier_mode_label = QLabel("Barrier Mode: Add")
-        self.barrier_mode_label.setStyleSheet("font-weight: bold; font-size: 12px;")
-        self.ui_layout.addWidget(self.barrier_mode_label)
+        # Add label that explains to use right click for barrier points
+        self.ui_layout.addWidget(QLabel("Right Click: Barrier Points"))
+        # Add label that explains to use left click for track control points
+        self.ui_layout.addWidget(QLabel("Left Click: Track Control Points"))
+
+        # Statistics labels
+        self.track_length_label = QLabel("Track Length: --")
+        self.ui_layout.addWidget(self.track_length_label)
+        
+        self.min_radius_label = QLabel("Min Radius: --")
+        self.ui_layout.addWidget(self.min_radius_label)
+        
+        self.cone_count_label = QLabel("Cones: \n Blue: -, Yellow: - \n Total: -")
+        self.ui_layout.addWidget(self.cone_count_label)
         
         # Add stretch to push everything up
         self.ui_layout.addStretch(1)
@@ -155,7 +160,6 @@ class FSTrackDraw(QMainWindow):
         self.selected_point_index = None
         self.dragging = False
         self.dragging_barrier = False
-
         self.barrier_mode = "add"  # Default mode is adding barrier points
 
         # Add logo at the bottom right
@@ -163,7 +167,7 @@ class FSTrackDraw(QMainWindow):
         self.logo_pixmap = QPixmap("TrackDraw_Logo.png")  # Load your logo image
         # Add the logo label to the layout
         self.ui_layout.addStretch(1)  # Push everything up
-        self.ui_layout.addWidget(self.logo_label, 0, Qt.AlignCenter|Qt.AlignBottom)
+        self.ui_layout.addWidget(self.logo_label, 0, Qt.AlignCenter)
         # Handle window resize events
         self.main_widget.resizeEvent = self.on_resize
         # Initial logo setup
