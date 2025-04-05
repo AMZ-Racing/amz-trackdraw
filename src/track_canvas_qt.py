@@ -2,8 +2,6 @@ import numpy as np
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QPointF
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QPolygonF
-import cv2
-from shapely.geometry import Polygon
 from utils_qt import sample_cones
 
 
