@@ -35,9 +35,7 @@ class FSTrackDraw(QMainWindow):
             config = yaml.safe_load(file)
             self.px_per_m = config.get('px_per_m', 10.0)
             sat_img_file = config.get('sat_img_path', '')
-            occup_img_file = config.get('occ_img_path', '')
             self.fpath_location_sat_img = os.path.join(self.folderpath_location, sat_img_file)
-            self.fpath_location_occup_img = os.path.join(self.folderpath_location, occup_img_file)
         
         # Create main widget and layout
         self.main_widget = QWidget()
