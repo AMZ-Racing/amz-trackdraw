@@ -84,8 +84,10 @@ Before starting, ensure you have the following:
 
    The tool will load the satellite image and display it on a GUI where you can:
    - Add, remove, and move control points that define the track.
-   - Define the centerline and boundaries.
-   - Define an outer barrier and obstacles as polygons.
+   - Zoom in or pan on your image with the middle mouse button.
+   - Define the centerline via control points of a cubic spline.
+   - Adjust the track width.
+   - Define an outer barrier as a collection of connected line segments.
    - Adjust the cone spacing and boundary backoff interactively.
 
 7. **(Optional) Export the Track as a CSV:**
