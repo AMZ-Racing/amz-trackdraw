@@ -14,6 +14,11 @@ consecutive cones. It also lets you draw a barrier of the available space onto t
 
 ## Getting Started
 
+- Left Mouse Button: Defining the Track (Add, Move, or Remove mode).
+- Middle Mouse Button: Panning the image.
+- Mouse Wheel: Zooming in on the image.
+- Right Mouse Button: Defining the Barrier (Add, Move, or Remove mode).
+
 You can follow the steps below to create your track and use it for simulations.
 
 ### Prerequisites
@@ -84,15 +89,15 @@ Before starting, ensure you have the following:
 
    The tool will load the satellite image and display it on a GUI where you can:
    - Add, remove, and move control points that define the track.
-   - Zoom in or pan on your image with the middle mouse button.
+   - Zoom in or pan on your image with the *middle mouse button*.
    - Define the centerline via control points of a cubic spline.
    - Adjust the track width.
-   - Define an outer barrier as a collection of connected line segments.
+   - Using the right mouse button, define an outer barrier as a collection of connected line segments by adding, moving, or removing barrier points.
    - Adjust the cone spacing and boundary backoff interactively.
 
 7. **(Optional) Export the Track as a CSV:**
-   - Once you've finished defining the track, you can export the track layout as a CSV file. The CSV contains the cone positions along the left and right boundaries, including tags for the cone color.
-   - Use the "Export CSV" button in the GUI to save the track layout.
+   - After defining the track, export the track layout as a CSV file. The CSV contains the cone positions along the left and right boundaries, including tags for the cone color.
+   - Save the track layout by using the "Export CSV" button in the GUI.
    - The exported CSV can be visualized with `src/plot_csv_track.py`.
 
    The CSV format will look like this:
