@@ -28,9 +28,9 @@ def robust_parallel_offset(ls, distance, side, join_style=2):
     if offset.is_empty:
         return None
     if offset.geom_type == "MultiLineString":
-        lines = list(offset)
-        lines.sort(key=lambda l: l.length, reverse=True)
-        return lines[0]
+      lines = list(offset.geoms)  # Use .geoms to access individual LineStrings.
+      lines.sort(key=lambda l: l.length, reverse=True)
+      return lines[0]
     return offset
 
 def generate_offset_boundaries(track_points, track_width_meters, px_per_m):
